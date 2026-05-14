@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>URL Vault</title>
+<style>
+:root {
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+  --tr: 0.18s cubic-bezier(0.4,0,0.2,1);
+  --radius: 13px; --radius-lg: 18px; --radius-sm: 9px;
+  --sidebar-w: 240px;
+}
+[data-theme="dark"] {
+  --bg:#000; --bg2:#111; --bg3:#1a1a1a;
+  --s1:rgba(255,255,255,.06); --s2:rgba(255,255,255,.09); --s3:rgba(255,255,255,.14);
+  --b1:rgba(255,255,255,.09); --b2:rgba(255,255,255,.17);
+  --t1:rgba(255,255,255,.90); --t2:rgba(255,255,255,.52); --t3:rgba(255,255,255,.28);
+  --accent:rgba(255,255,255,.92); --atxt:#000;
+  --red:#ff453a; --redbg:rgba(255,69,58,.13);
+  --green:#30d158; --greenbg:rgba(48,209,88,.12);
+  --blue:#0a84ff; --bluebg:rgba(10,132,255,.12);
+  --shadow:0 2px 20px rgba(0,0,0,.55); --shadowlg:0 8px 48px rgba(0,0,0,.75);
+  --glass:rgba(15,15,15,.82);
+}
+[data-theme="light"] {
+  --bg:#f2f2f7; --bg2:#fff; --bg3:#f2f2f7;
+  --s1:rgba(0,0,0,.04); --s2:rgba(0,0,0,.07); --s3:rgba(0,0,0,.11);
+  --b1:rgba(0,0,0,.08); --b2:rgba(0,0,0,.16);
+  --t1:rgba(0,0,0,.88); --t2:rgba(0,0,0,.50); --t3:rgba(0,0,0,.28);
+  --accent:rgba(0,0,0,.88); --atxt:#fff;
+  --red:#ff3b30; --redbg:rgba(255,59,48,.10);
+  --green:#34c759; --greenbg:rgba(52,199,89,.10);
+  --blue:#007aff; --bluebg:rgba(0,122,255,.10);
+  --shadow:0 2px 20px rgba(0,0,0,.07); --shadowlg:0 8px 48px rgba(0,0,0,.13);
+  --glass:rgba(242,242,247,.88);
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:var(--font);background:var(--bg);color:var(--t1);-webkit-font-smoothing:antialiased}
+
+/* ── AUTH SCREEN ──────────────────────────────── */
+.auth-screen{
+  position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+  background:var(--bg);z-index:500;
+  transition:opacity .3s;
+}
+.auth-screen.hidden{opacity:0;pointer-events:none}
+.auth-card{
+  background:var(--bg2);border:1px solid var(--b2);border-radius:var(--radius-lg);
+  padding:36px 32px;width:380px;max-width:94vw;
+  box-shadow:var(--shadowlg);
+}
+.auth-logo{font-size:28px;margin-bottom:4px}
+.auth-title{font-size:22px;font-weight:600;letter-spacing:-.4px;margin-bottom:4px}
+.auth-sub{font-size:13px;color:var(--t2);margin-bottom:28px;line-height:1.5}
+.auth-tabs{display:flex;background:var(--s1);border-radius:var(--radius-sm);padding:3px;margin-bottom:24px;border:1px solid var(--b1)}
+.auth-tab{flex:1;padding:7px;border-radius:7px;font-family:var(--font);font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--t2);transition:all var(--tr)}
+.auth-tab.active{background:var(--bg2);color:var(--t1);box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.arow{display:flex;flex-direction:column;gap:5px;margin-bottom:13px}
+.alabel{font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--t3)}
+.auth-card input{
+  background:var(--s1);border:1px solid var(--b1);border-radius:var(--radius-sm);
+  padding:10px 13px;font-family:var(--font);font-size:14px;color:var(--t1);
+  outline:none;width:100%;transition:all var(--tr);
+}
+.auth-card input::placeholder{color:var(--t3)}
+.auth-card input:focus{border-color:var(--b2);background:var(--s2)}
+.auth-err{font-size:12px;color:var(--red);background:var(--redbg);border-radius:7px;padding:8px 12px;margin-bottom:12px;display:none}
+.auth-err.show{display:block}
+.btn-auth{width:100%;padding:11px;border-radius:var(--radius-sm);font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;border:none;background:var(--accent);color:var(--atxt);transition:all var(--tr);margin-top:4px}
+.btn-auth:hover{opacity:.85}
+.btn-auth:disabled{opacity:.45;cursor:not-allowed}
+.auth-divider{text-align:center;font-size:12px;color:var(--t3);margin:14px 0}
+.btn-google{width:100%;padding:10px;border-radius:var(--radius-sm);font-family:var(--font);font-size:13px;font-weight:500;cursor:pointer;background:var(--s1);border:1px solid var(--b1);color:var(--t1);display:flex;align-items:center;justify-content:center;gap:8px;transition:all var(--tr)}
+.btn-google:hover{background:var(--s2)}
+
+/* ── APP SHELL ─────────────────────────────────── */
+.app{display:flex;height:100vh;overflow:hidden;opacity:0;transition:opacity .3s}
+.app.visible{opacity:1}
+
+/* ── SIDEBAR ───────────────────────────────────── */
+.sidebar{
+  width:var(--sidebar-w);min-width:var(--sidebar-w);
+  background:var(--glass);backdrop-filter:blur(40px) saturate(180%);
+  -webkit-backdrop-filter:blur(40px) saturate(180%);
+  border-right:1px solid var(--b1);display:flex;flex-direction:column;overflow:hidden;
+}
+.sb-head{padding:18px 16px 12px;border-bottom:1px solid var(--b1)}
+.sb-logo{display:flex;align-items:center;gap:8px;margin-bottom:2px}
+.sb-title{font-size:17px;font-weight:600;letter-spacing:-.4px}
+.sb-user{font-size:11px;color:var(--t3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:190px}
+.sb-scroll{flex:1;overflow-y:auto;padding:0 0 12px}
+.sb-scroll::-webkit-scrollbar{width:0}
+.sb-section{padding:14px 10px 4px}
+.sb-lbl{font-size:10px;font-weight:600;letter-spacing:.7px;text-transform:uppercase;color:var(--t3);padding:0 6px;margin-bottom:4px}
+.nav{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--radius-sm);font-size:13px;color:var(--t2);cursor:pointer;border:none;background:transparent;width:100%;text-align:left;transition:all var(--tr)}
+.nav:hover{background:var(--s2);color:var(--t1)}
+.nav.active{background:var(--s3);color:var(--t1);font-weight:500}
+.nav-ic{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+.nav-cnt{margin-left:auto;font-size:11px;color:var(--t3);background:var(--s2);padding:1px 7px;border-radius:8px;min-width:20px;text-align:center}
+.nav.trash{color:var(--red)}
+.nav.trash .nav-cnt{color:var(--red);background:var(--redbg)}
+.sb-foot{padding:10px;border-top:1px solid var(--b1);display:flex;gap:7px;align-items:center}
+.icon-round{width:32px;height:32px;border-radius:50%;background:var(--s1);border:1px solid var(--b1);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all var(--tr);flex-shrink:0;color:var(--t2)}
+.icon-round:hover{background:var(--s2);color:var(--t1)}
+.icon-round svg{width:14px;height:14px}
+.new-folder-btn{flex:1;padding:7px 10px;border-radius:var(--radius-sm);background:var(--s1);border:1px solid var(--b1);font-family:var(--font);font-size:12px;color:var(--t2);cursor:pointer;transition:all var(--tr);display:flex;align-items:center;gap:6px}
+.new-folder-btn:hover{background:var(--s2);color:var(--t1)}
+
+/* ── MAIN ──────────────────────────────────────── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
+.topbar{padding:13px 22px;border-bottom:1px solid var(--b1);display:flex;align-items:center;gap:11px;background:var(--glass);backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px);flex-shrink:0}
+.view-title{font-size:17px;font-weight:600;letter-spacing:-.3px;flex:1}
+.search-wrap{position:relative}
+.search-wrap svg{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--t3);pointer-events:none}
+.search-wrap input{background:var(--s1);border:1px solid var(--b1);border-radius:8px;padding:7px 12px 7px 30px;font-family:var(--font);font-size:13px;color:var(--t1);width:200px;outline:none;transition:all var(--tr)}
+.search-wrap input::placeholder{color:var(--t3)}
+.search-wrap input:focus{border-color:var(--b2);background:var(--s2);width:240px}
+
+.btn{padding:7px 15px;border-radius:var(--radius-sm);font-family:var(--font);font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all var(--tr);display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.btn-fill{background:var(--accent);color:var(--atxt)}
+.btn-fill:hover{opacity:.85;transform:scale(.98)}
+.btn-ghost{background:var(--s1);color:var(--t2);border:1px solid var(--b1)}
+.btn-ghost:hover{background:var(--s2);color:var(--t1)}
+.btn-red{background:var(--redbg);color:var(--red);border:1px solid transparent}
+.btn-red:hover{background:rgba(255,59,48,.22)}
+.btn-green{background:var(--greenbg);color:var(--green);border:1px solid transparent}
+.btn-sm{padding:5px 11px;font-size:12px;border-radius:7px}
+
+/* ── CONTENT ───────────────────────────────────── */
+.content{flex:1;overflow-y:auto;padding:22px}
+.content::-webkit-scrollbar{width:5px}
+.content::-webkit-scrollbar-track{background:transparent}
+.content::-webkit-scrollbar-thumb{background:var(--s3);border-radius:4px}
+
+.folder-meta{display:flex;align-items:center;gap:12px;margin-bottom:20px}
+.folder-meta-icon{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.folder-meta h2{font-size:20px;font-weight:600;letter-spacing:-.4px}
+.folder-meta-actions{margin-left:auto;display:flex;gap:8px}
+
+.trash-note{background:var(--redbg);border:1px solid rgba(255,59,48,.15);border-radius:var(--radius);padding:11px 15px;margin-bottom:14px;font-size:12px;color:var(--red);line-height:1.6;display:flex;gap:8px}
+.trash-topbar{display:flex;justify-content:flex-end;margin-bottom:12px}
+
+/* url cards */
+.url-grid{display:flex;flex-direction:column;gap:5px}
+.url-card{background:var(--bg2);border:1px solid var(--b1);border-radius:var(--radius);padding:11px 14px;display:flex;align-items:center;gap:12px;transition:all var(--tr);animation:fadeUp .2s ease;position:relative;overflow:hidden}
+.url-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--fc,transparent);border-radius:3px 0 0 3px;opacity:.65}
+.url-card:hover{background:var(--s2);border-color:var(--b2)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+.favicon{width:28px;height:28px;min-width:28px;background:var(--s1);border:1px solid var(--b1);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;overflow:hidden}
+.favicon img{width:15px;height:15px;object-fit:contain}
+.card-body{flex:1;min-width:0}
+.card-title{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:1px}
+.card-url{font-size:11px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;font-family:'SF Mono','Menlo','Monaco',monospace;letter-spacing:-.2px}
+.card-url:hover{color:var(--t2)}
+.folder-tag{font-size:10px;font-weight:500;padding:3px 8px;border-radius:6px;background:var(--s1);border:1px solid var(--b1);color:var(--t3);white-space:nowrap}
+.card-actions{display:flex;gap:4px;opacity:0;transition:opacity var(--tr)}
+.url-card:hover .card-actions{opacity:1}
+.icon-btn{width:27px;height:27px;border-radius:7px;background:var(--s1);border:1px solid var(--b1);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all var(--tr);color:var(--t2)}
+.icon-btn svg{width:12px;height:12px}
+.icon-btn:hover{background:var(--s2);color:var(--t1);border-color:var(--b2)}
+.icon-btn.del:hover{background:var(--redbg);color:var(--red);border-color:var(--redbg)}
+
+/* loading spinner */
+.spinner{display:inline-block;width:18px;height:18px;border:2px solid var(--b2);border-top-color:var(--t1);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-state{display:flex;align-items:center;justify-content:center;gap:10px;padding:60px;color:var(--t2);font-size:13px}
+
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:70px 20px;color:var(--t3);gap:10px;text-align:center}
+.empty-ico{font-size:36px;opacity:.3}
+.empty h3{font-size:15px;font-weight:500;color:var(--t2)}
+.empty p{font-size:12px;line-height:1.7;max-width:240px}
+
+/* ── MODALS ────────────────────────────────────── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);z-index:200;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.overlay.show{opacity:1;pointer-events:all}
+.modal{background:var(--bg2);border:1px solid var(--b2);border-radius:var(--radius-lg);padding:24px;width:350px;max-width:93vw;box-shadow:var(--shadowlg);transform:scale(.94) translateY(10px);transition:transform .25s cubic-bezier(.34,1.56,.64,1)}
+.overlay.show .modal{transform:scale(1) translateY(0)}
+.modal h3{font-size:16px;font-weight:600;letter-spacing:-.3px;margin-bottom:6px}
+.modal p{font-size:13px;color:var(--t2);line-height:1.6;margin-bottom:18px}
+.mrow{display:flex;flex-direction:column;gap:5px;margin-bottom:13px}
+.mlabel{font-size:10px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--t3)}
+.modal input,.modal select{background:var(--s1);border:1px solid var(--b1);border-radius:var(--radius-sm);padding:9px 12px;font-family:var(--font);font-size:13px;color:var(--t1);outline:none;width:100%;transition:all var(--tr)}
+.modal input::placeholder{color:var(--t3)}
+.modal input:focus,.modal select:focus{border-color:var(--b2);background:var(--s2)}
+.modal select{appearance:none;-webkit-appearance:none;cursor:pointer}
+.modal select option{background:var(--bg2)}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
+.color-row{display:flex;gap:7px;flex-wrap:wrap;margin-top:5px}
+.swatch{width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all var(--tr)}
+.swatch:hover{transform:scale(1.2)}
+.swatch.sel{border-color:var(--t1);transform:scale(1.15)}
+.emoji-row{display:flex;gap:8px}
+.emoji-in{width:52px;text-align:center;font-size:16px}
+.name-in{flex:1}
+
+/* ── TOAST ─────────────────────────────────────── */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--bg2);border:1px solid var(--b2);border-radius:10px;padding:10px 18px;font-size:13px;color:var(--t1);box-shadow:var(--shadowlg);backdrop-filter:blur(30px);z-index:999;opacity:0;pointer-events:none;transition:all .28s cubic-bezier(.34,1.56,.64,1);white-space:nowrap}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<!-- ════ AUTH SCREEN ════ -->
+<div class="auth-screen" id="authScreen">
+  <div class="auth-card">
+    <div class="auth-logo">⬡</div>
+    <div class="auth-title">URL Vault</div>
+    <div class="auth-sub">Deine Links, sicher gespeichert.<br>Von überall erreichbar.</div>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tab-login" onclick="switchAuthTab('login')">Anmelden</button>
+      <button class="auth-tab" id="tab-register" onclick="switchAuthTab('register')">Registrieren</button>
+    </div>
+
+    <div id="auth-err" class="auth-err"></div>
+
+    <div class="arow"><div class="alabel">E-Mail</div><input type="email" id="a-email" placeholder="mail@beispiel.de"></div>
+    <div class="arow"><div class="alabel">Passwort</div><input type="password" id="a-pass" placeholder="Mindestens 6 Zeichen"></div>
+    <div class="arow" id="a-pass2-row" style="display:none"><div class="alabel">Passwort bestätigen</div><input type="password" id="a-pass2" placeholder="Passwort wiederholen"></div>
+
+    <button class="btn-auth" id="authBtn" onclick="handleAuth()">Anmelden</button>
+
+    <div class="auth-divider">oder</div>
+    <button class="btn-google" onclick="handleGoogle()">
+      <svg width="16" height="16" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+      Mit Google anmelden
+    </button>
+  </div>
+</div>
+
+<!-- ════ APP ════ -->
+<div class="app" id="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sb-head">
+      <div class="sb-logo"><span style="font-size:18px">⬡</span><span class="sb-title">URL Vault</span></div>
+      <div class="sb-user" id="sbUser">—</div>
+    </div>
+    <div class="sb-scroll">
+      <div class="sb-section">
+        <div class="sb-lbl">Bibliothek</div>
+        <button class="nav active" id="nav-all" onclick="setView('all')">
+          <span class="nav-ic" style="background:var(--s2)">📂</span>
+          <span style="flex:1;text-align:left">Alle Links</span>
+          <span class="nav-cnt" id="cnt-all">0</span>
+        </button>
+        <button class="nav" id="nav-recent" onclick="setView('recent')">
+          <span class="nav-ic" style="background:var(--s2)">🕐</span>
+          <span style="flex:1;text-align:left">Zuletzt hinzugefügt</span>
+        </button>
+      </div>
+      <div class="sb-section">
+        <div class="sb-lbl">Ordner</div>
+        <div id="folderNav"></div>
+      </div>
+      <div class="sb-section">
+        <button class="nav trash" id="nav-trash" onclick="setView('trash')">
+          <span class="nav-ic" style="background:var(--redbg)">🗑</span>
+          <span style="flex:1;text-align:left">Zuletzt gelöscht</span>
+          <span class="nav-cnt" id="cnt-trash" style="display:none">0</span>
+        </button>
+      </div>
+    </div>
+    <div class="sb-foot">
+      <button class="icon-round" id="themeBtn" onclick="toggleTheme()" title="Design wechseln">🌙</button>
+      <button class="icon-round" onclick="handleLogout()" title="Abmelden">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+      <button class="new-folder-btn" onclick="openNewFolder()">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Neuer Ordner
+      </button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="topbar">
+      <div class="view-title" id="viewTitle">Alle Links</div>
+      <div class="search-wrap">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="text" id="searchInput" placeholder="Suchen…" oninput="renderContent()">
+      </div>
+      <button class="btn btn-fill btn-sm" onclick="openAddModal()">+ URL</button>
+    </div>
+    <div class="content" id="content"></div>
+  </main>
+</div>
+
+<!-- ADD URL MODAL -->
+<div class="overlay" id="addOverlay">
+  <div class="modal">
+    <h3>URL hinzufügen</h3>
+    <p>Speichere einen neuen Link in deinem Vault.</p>
+    <div class="mrow"><div class="mlabel">URL</div><input type="url" id="m-url" placeholder="https://…"></div>
+    <div class="mrow"><div class="mlabel">Name (optional)</div><input type="text" id="m-name" placeholder="Wird automatisch erkannt"></div>
+    <div class="mrow"><div class="mlabel">Ordner</div><select id="m-folder"></select></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeOverlay('addOverlay')">Abbrechen</button>
+      <button class="btn btn-fill" onclick="addUrl()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- FOLDER MODAL -->
+<div class="overlay" id="folderOverlay">
+  <div class="modal">
+    <h3 id="fModalTitle">Neuer Ordner</h3>
+    <div class="mrow">
+      <div class="mlabel">Emoji & Name</div>
+      <div class="emoji-row">
+        <input type="text" id="f-emoji" class="emoji-in" value="📁" maxlength="2">
+        <input type="text" id="f-name" class="name-in" placeholder="z.B. Schule, Arbeit…">
+      </div>
+    </div>
+    <div class="mrow"><div class="mlabel">Farbe</div><div class="color-row" id="colorPicker"></div></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeOverlay('folderOverlay')">Abbrechen</button>
+      <button class="btn btn-fill" id="fSaveBtn" onclick="saveFolder()">Erstellen</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div class="overlay" id="confirmOverlay">
+  <div class="modal">
+    <h3 id="c-title"></h3><p id="c-text"></p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeOverlay('confirmOverlay')">Abbrechen</button>
+      <button class="btn btn-red" id="c-btn">Löschen</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- ════ FIREBASE ════ -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithPopup }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, doc, addDoc, setDoc, deleteDoc, getDocs, query, orderBy, onSnapshot, serverTimestamp }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+// ── Firebase init ────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyCv8It5TIar-E1RSPiq6MR7EltZmR32-NA",
+  authDomain: "url-vault-2f597.firebaseapp.com",
+  databaseURL: "https://url-vault-2f597-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "url-vault-2f597",
+  storageBucket: "url-vault-2f597.firebasestorage.app",
+  messagingSenderId: "617584041589",
+  appId: "1:617584041589:web:69fe2769d333872b3e623c",
+  measurementId: "G-73T8GGDE90"
+};
+const fbApp  = initializeApp(firebaseConfig);
+const auth   = getAuth(fbApp);
+const db     = getFirestore(fbApp);
+const gProvider = new GoogleAuthProvider();
+
+// ── State ────────────────────────────────────────
+let currentUser = null;
+let urls    = [];
+let folders = [];
+let trash   = [];
+let view    = 'all';
+let editFId = null;
+let selColor = '#0a84ff';
+let confirmCb = null;
+let theme = localStorage.getItem('vlt_th') || 'dark';
+let unsubUrls = null, unsubFolders = null, unsubTrash = null;
+
+const COLORS = ['#0a84ff','#30d158','#ff9f0a','#ff453a','#bf5af2','#ff375f','#64d2ff','#ffd60a','#ac8e68','#8e8e93'];
+
+// ── Firestore helpers ────────────────────────────
+const col = (path) => collection(db, path);
+const userCol = (sub) => col(`users/${currentUser.uid}/${sub}`);
+
+async function fsAdd(sub, data) {
+  return addDoc(userCol(sub), { ...data, createdAt: serverTimestamp() });
+}
+async function fsSet(sub, id, data) {
+  return setDoc(doc(db, `users/${currentUser.uid}/${sub}/${id}`), data, { merge: true });
+}
+async function fsDel(sub, id) {
+  return deleteDoc(doc(db, `users/${currentUser.uid}/${sub}/${id}`));
+}
+
+function listenCol(sub, cb) {
+  const q = query(userCol(sub), orderBy('createdAt', 'desc'));
+  return onSnapshot(q, snap => {
+    cb(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  }, () => {
+    // fallback: no order
+    onSnapshot(userCol(sub), snap => {
+      cb(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+  });
+}
+
+// ── Auth state ───────────────────────────────────
+onAuthStateChanged(auth, user => {
+  if (user) {
+    currentUser = user;
+    showApp(user);
+  } else {
+    currentUser = null;
+    showAuth();
+  }
+});
+
+function showAuth() {
+  document.getElementById('authScreen').classList.remove('hidden');
+  document.getElementById('app').classList.remove('visible');
+  if (unsubUrls) { unsubUrls(); unsubFolders(); unsubTrash(); }
+}
+
+function showApp(user) {
+  document.getElementById('authScreen').classList.add('hidden');
+  document.getElementById('app').classList.add('visible');
+  document.getElementById('sbUser').textContent = user.email || user.displayName || '—';
+  applyTheme(theme);
+
+  // Listen to Firestore
+  unsubFolders = listenCol('folders', data => {
+    // Sort folders: by createdAt ts if available
+    folders = data;
+    if (!folders.length) createDefaultFolders();
+    renderSidebar();
+    renderContent();
+  });
+  unsubUrls = listenCol('urls', data => {
+    urls = data;
+    renderSidebar();
+    renderContent();
+  });
+  unsubTrash = listenCol('trash', data => {
+    trash = data;
+    renderSidebar();
+    if (view === 'trash') renderContent();
+  });
+}
+
+async function createDefaultFolders() {
+  const defaults = [
+    { name:'Arbeit', emoji:'💼', color:'#0a84ff' },
+    { name:'Schule', emoji:'📚', color:'#30d158' },
+    { name:'Privat', emoji:'🏠', color:'#ff9f0a' },
+    { name:'Sonstiges', emoji:'📌', color:'#bf5af2' },
+  ];
+  for (const f of defaults) await fsAdd('folders', f);
+}
+
+// ── Auth handlers ─────────────────────────────────
+let authMode = 'login';
+window.switchAuthTab = (mode) => {
+  authMode = mode;
+  document.getElementById('tab-login').classList.toggle('active', mode==='login');
+  document.getElementById('tab-register').classList.toggle('active', mode==='register');
+  document.getElementById('authBtn').textContent = mode==='login' ? 'Anmelden' : 'Registrieren';
+  document.getElementById('a-pass2-row').style.display = mode==='register' ? '' : 'none';
+  document.getElementById('auth-err').classList.remove('show');
+};
+
+window.handleAuth = async () => {
+  const email = document.getElementById('a-email').value.trim();
+  const pass  = document.getElementById('a-pass').value;
+  const pass2 = document.getElementById('a-pass2').value;
+  const btn   = document.getElementById('authBtn');
+  const err   = document.getElementById('auth-err');
+  err.classList.remove('show');
+
+  if (!email || !pass) { showAuthErr('Bitte E-Mail und Passwort eingeben.'); return; }
+  if (authMode==='register' && pass !== pass2) { showAuthErr('Passwörter stimmen nicht überein.'); return; }
+  if (authMode==='register' && pass.length < 6) { showAuthErr('Passwort muss mindestens 6 Zeichen haben.'); return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  try {
+    if (authMode==='login') {
+      await signInWithEmailAndPassword(auth, email, pass);
+    } else {
+      await createUserWithEmailAndPassword(auth, email, pass);
+    }
+  } catch(e) {
+    showAuthErr(firebaseErrMsg(e.code));
+    btn.disabled = false;
+    btn.textContent = authMode==='login' ? 'Anmelden' : 'Registrieren';
+  }
+};
+
+window.handleGoogle = async () => {
+  try {
+    await signInWithPopup(auth, gProvider);
+  } catch(e) {
+    showAuthErr(firebaseErrMsg(e.code));
+  }
+};
+
+window.handleLogout = () => {
+  confirm2('Abmelden?', 'Du wirst aus deinem Account abgemeldet.', 'Abmelden', async () => {
+    await signOut(auth);
+    toast('Erfolgreich abgemeldet');
+  });
+};
+
+function showAuthErr(msg) {
+  const el = document.getElementById('auth-err');
+  el.textContent = msg; el.classList.add('show');
+}
+
+function firebaseErrMsg(code) {
+  const map = {
+    'auth/user-not-found': 'Kein Account mit dieser E-Mail gefunden.',
+    'auth/wrong-password': 'Falsches Passwort.',
+    'auth/invalid-credential': 'E-Mail oder Passwort falsch.',
+    'auth/email-already-in-use': 'Diese E-Mail wird bereits verwendet.',
+    'auth/too-many-requests': 'Zu viele Versuche. Bitte warte kurz.',
+    'auth/invalid-email': 'Ungültige E-Mail-Adresse.',
+    'auth/popup-closed-by-user': 'Anmeldung abgebrochen.',
+  };
+  return map[code] || 'Fehler: ' + code;
+}
+
+// ── Theme ─────────────────────────────────────────
+function applyTheme(t) {
+  theme = t;
+  document.documentElement.setAttribute('data-theme', t);
+  document.getElementById('themeBtn').textContent = t==='dark' ? '🌙' : '☀️';
+  localStorage.setItem('vlt_th', t);
+}
+window.toggleTheme = () => applyTheme(theme==='dark' ? 'light' : 'dark');
+
+// ── Sidebar ───────────────────────────────────────
+function renderSidebar() {
+  document.getElementById('folderNav').innerHTML = folders.map(f => `
+    <button class="nav ${view===f.id?'active':''}" onclick="setView('${f.id}')">
+      <span class="nav-ic" style="background:${f.color}22">${f.emoji}</span>
+      <span style="flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</span>
+      <span class="nav-cnt">${urls.filter(u=>u.fid===f.id).length||''}</span>
+    </button>`).join('');
+
+  document.getElementById('cnt-all').textContent = urls.length;
+  const tc = document.getElementById('cnt-trash');
+  if (trash.length) { tc.textContent = trash.length; tc.style.display = ''; }
+  else tc.style.display = 'none';
+
+  ['all','recent','trash'].forEach(v => {
+    const el = document.getElementById('nav-'+v);
+    if (el) el.classList.toggle('active', view===v);
+  });
+}
+
+// ── Content ───────────────────────────────────────
+window.setView = (v) => {
+  view = v;
+  document.getElementById('searchInput').value = '';
+  renderSidebar();
+  renderContent();
+};
+
+function renderContent() {
+  const q  = document.getElementById('searchInput').value.toLowerCase();
+  const el = document.getElementById('content');
+  const title = document.getElementById('viewTitle');
+
+  if (view==='trash') { title.textContent='Zuletzt gelöscht'; renderTrash(el); return; }
+
+  let items = [...urls];
+  let folder = null;
+
+  if (view==='all') {
+    title.textContent = 'Alle Links';
+    items.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+  } else if (view==='recent') {
+    title.textContent = 'Zuletzt hinzugefügt';
+    items = items.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0)).slice(0,25);
+  } else {
+    folder = folders.find(f=>f.id===view);
+    title.textContent = folder ? `${folder.emoji} ${folder.name}` : 'Ordner';
+    items = items.filter(u=>u.fid===view);
+  }
+
+  if (q) items = items.filter(u=>u.name?.toLowerCase().includes(q)||u.url?.toLowerCase().includes(q));
+  el.innerHTML = '';
+
+  if (folder) {
+    const meta = document.createElement('div');
+    meta.className = 'folder-meta';
+    meta.innerHTML = `
+      <div class="folder-meta-icon" style="background:${folder.color}22">${folder.emoji}</div>
+      <div><h2>${esc(folder.name)}</h2></div>
+      <div class="folder-meta-actions">
+        <button class="btn btn-ghost btn-sm" onclick="openEditFolder('${folder.id}')">Bearbeiten</button>
+        <button class="btn btn-red btn-sm" onclick="confirmDeleteFolder('${folder.id}')">Löschen</button>
+      </div>`;
+    el.appendChild(meta);
+  }
+
+  if (!items.length) {
+    el.insertAdjacentHTML('beforeend',`<div class="empty"><div class="empty-ico">🔗</div><h3>Keine Links</h3><p>Klicke auf „+ URL" oben rechts, um deinen ersten Link hinzuzufügen.</p></div>`);
+    return;
+  }
+
+  const grid = document.createElement('div');
+  grid.className = 'url-grid';
+  items.forEach(item => {
+    const fobj = folders.find(f=>f.id===item.fid);
+    const fav  = `https://www.google.com/s2/favicons?sz=32&domain_url=${encodeURIComponent(item.url)}`;
+    const card = document.createElement('div');
+    card.className = 'url-card';
+    if (fobj) card.style.setProperty('--fc', fobj.color);
+    card.innerHTML = `
+      <div class="favicon"><img src="${fav}" alt="" onerror="this.style.display='none'"></div>
+      <div class="card-body">
+        <div class="card-title">${esc(item.name||domain(item.url))}</div>
+        <div class="card-url" onclick="goUrl('${escA(item.url)}')" title="${escA(item.url)}">${domain(item.url)}</div>
+      </div>
+      ${fobj&&view!==fobj.id?`<span class="folder-tag">${fobj.emoji} ${esc(fobj.name)}</span>`:''}
+      <div class="card-actions">
+        <button class="icon-btn" onclick="goUrl('${escA(item.url)}')" title="Öffnen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        </button>
+        <button class="icon-btn" onclick="copyUrl('${escA(item.url)}')" title="Kopieren">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
+        <button class="icon-btn del" onclick="deleteUrl('${item.id}')" title="Löschen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+        </button>
+      </div>`;
+    grid.appendChild(card);
+  });
+  el.appendChild(grid);
+}
+
+function renderTrash(el) {
+  el.innerHTML = '';
+  if (!trash.length) {
+    el.innerHTML=`<div class="empty"><div class="empty-ico">✓</div><h3>Papierkorb leer</h3><p>Hier erscheinen gelöschte Links.</p></div>`;
+    return;
+  }
+  el.innerHTML=`
+    <div class="trash-note"><span>⚠️</span><span>Gelöschte Links können wiederhergestellt oder endgültig entfernt werden.</span></div>
+    <div class="trash-topbar"><button class="btn btn-red btn-sm" onclick="confirmPurgeAll()">Alle endgültig löschen</button></div>`;
+  const grid = document.createElement('div');
+  grid.className = 'url-grid';
+  trash.forEach(item => {
+    const fobj = folders.find(f=>f.id===item.fid);
+    const fav  = `https://www.google.com/s2/favicons?sz=32&domain_url=${encodeURIComponent(item.url)}`;
+    const card = document.createElement('div');
+    card.className = 'url-card';
+    card.style.opacity = '.55';
+    card.innerHTML = `
+      <div class="favicon" style="opacity:.5"><img src="${fav}" alt="" onerror="this.style.display='none'"></div>
+      <div class="card-body">
+        <div class="card-title" style="text-decoration:line-through">${esc(item.name||domain(item.url))}</div>
+        <div class="card-url">${domain(item.url)}</div>
+      </div>
+      ${fobj?`<span class="folder-tag">${fobj.emoji} ${esc(fobj.name)}</span>`:''}
+      <div class="card-actions" style="opacity:1">
+        <button class="icon-btn" style="color:var(--green);border-color:var(--greenbg)" onclick="restoreUrl('${item.id}')" title="Wiederherstellen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+        </button>
+        <button class="icon-btn del" onclick="purgeUrl('${item.id}')" title="Endgültig löschen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+        </button>
+      </div>`;
+    grid.appendChild(card);
+  });
+  el.appendChild(grid);
+}
+
+// ── URL CRUD ──────────────────────────────────────
+window.openAddModal = () => {
+  const sel = document.getElementById('m-folder');
+  const def = (view!=='all'&&view!=='recent'&&view!=='trash') ? view : folders[0]?.id||'';
+  sel.innerHTML = folders.map(f=>`<option value="${f.id}" ${f.id===def?'selected':''}>${f.emoji} ${esc(f.name)}</option>`).join('');
+  document.getElementById('m-url').value = '';
+  document.getElementById('m-name').value = '';
+  openOverlay('addOverlay');
+  setTimeout(()=>document.getElementById('m-url').focus(), 120);
+};
+
+window.addUrl = async () => {
+  let url  = document.getElementById('m-url').value.trim();
+  const name = document.getElementById('m-name').value.trim();
+  const fid  = document.getElementById('m-folder').value;
+  if (!url) { toast('Bitte eine URL eingeben.'); return; }
+  if (!url.startsWith('http://') && !url.startsWith('https://')) url = 'https://'+url;
+  try { new URL(url); } catch { toast('Ungültige URL.'); return; }
+  await fsAdd('urls', { url, name: name||domain(url), fid });
+  closeOverlay('addOverlay');
+  toast('Link gespeichert ✓');
+};
+
+window.deleteUrl = async (id) => {
+  const item = urls.find(u=>u.id===id);
+  if (!item) return;
+  await fsDel('urls', id);
+  await fsAdd('trash', { url: item.url, name: item.name, fid: item.fid });
+  toast('In Papierkorb verschoben');
+};
+
+window.restoreUrl = async (id) => {
+  const item = trash.find(t=>t.id===id);
+  if (!item) return;
+  await fsDel('trash', id);
+  await fsAdd('urls', { url: item.url, name: item.name, fid: item.fid });
+  toast('Link wiederhergestellt ✓');
+};
+
+window.purgeUrl = (id) => {
+  confirm2('Endgültig löschen?', 'Dieser Link wird dauerhaft entfernt und kann nicht wiederhergestellt werden.', 'Löschen', async () => {
+    await fsDel('trash', id);
+    toast('Endgültig gelöscht');
+  });
+};
+
+window.confirmPurgeAll = () => {
+  confirm2(`Alle ${trash.length} Links löschen?`, 'Der gesamte Papierkorb wird dauerhaft geleert.', 'Alle löschen', async () => {
+    await Promise.all(trash.map(t=>fsDel('trash', t.id)));
+    toast('Papierkorb geleert');
+  });
+};
+
+// ── Folder CRUD ───────────────────────────────────
+function buildColorPicker(sel) {
+  selColor = sel || COLORS[0];
+  document.getElementById('colorPicker').innerHTML = COLORS.map(c =>
+    `<div class="swatch ${c===selColor?'sel':''}" style="background:${c}" onclick="pickColor('${c}')"></div>`
+  ).join('');
+}
+window.pickColor = (c) => {
+  selColor = c;
+  document.querySelectorAll('.swatch').forEach(s => {
+    const bg = s.style.background || s.style.backgroundColor;
+    s.classList.toggle('sel', bg===c);
+  });
+};
+
+window.openNewFolder = () => {
+  editFId = null;
+  document.getElementById('fModalTitle').textContent = 'Neuer Ordner';
+  document.getElementById('fSaveBtn').textContent = 'Erstellen';
+  document.getElementById('f-emoji').value = '📁';
+  document.getElementById('f-name').value = '';
+  buildColorPicker(COLORS[0]);
+  openOverlay('folderOverlay');
+  setTimeout(()=>document.getElementById('f-name').focus(), 120);
+};
+
+window.openEditFolder = (id) => {
+  const f = folders.find(x=>x.id===id);
+  if (!f) return;
+  editFId = id;
+  document.getElementById('fModalTitle').textContent = 'Ordner bearbeiten';
+  document.getElementById('fSaveBtn').textContent = 'Speichern';
+  document.getElementById('f-emoji').value = f.emoji;
+  document.getElementById('f-name').value = f.name;
+  buildColorPicker(f.color);
+  openOverlay('folderOverlay');
+};
+
+window.saveFolder = async () => {
+  const emoji = document.getElementById('f-emoji').value.trim()||'📁';
+  const name  = document.getElementById('f-name').value.trim();
+  if (!name) { toast('Bitte einen Namen eingeben.'); return; }
+  if (editFId) {
+    await fsSet('folders', editFId, { emoji, name, color: selColor });
+    toast('Ordner aktualisiert');
+  } else {
+    await fsAdd('folders', { emoji, name, color: selColor });
+    toast('Ordner erstellt ✓');
+  }
+  closeOverlay('folderOverlay');
+};
+
+window.confirmDeleteFolder = (id) => {
+  const f = folders.find(x=>x.id===id);
+  const n = urls.filter(u=>u.fid===id).length;
+  confirm2(`„${f?.name}" löschen?`,
+    n ? `Der Ordner wird gelöscht. Die ${n} enthaltenen Links bleiben ohne Ordner erhalten.`
+      : 'Der Ordner ist leer und wird gelöscht.',
+    'Ordner löschen', async () => {
+    // move urls to first other folder
+    const fallback = folders.filter(x=>x.id!==id)[0]?.id||'';
+    const toMove = urls.filter(u=>u.fid===id);
+    await Promise.all(toMove.map(u=>fsSet('urls', u.id, { fid: fallback })));
+    await fsDel('folders', id);
+    if (view===id) view='all';
+    toast('Ordner gelöscht');
+  });
+};
+
+// ── Helpers ───────────────────────────────────────
+window.goUrl = (u) => window.open(u,'_blank','noopener,noreferrer');
+window.copyUrl = (u) => navigator.clipboard.writeText(u).then(()=>toast('URL kopiert ✓'));
+function domain(u) { try { return new URL(u).hostname.replace('www.',''); } catch { return u; } }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escA(s) { return String(s||'').replace(/'/g,'&#39;').replace(/"/g,'&quot;'); }
+
+// ── Overlays ──────────────────────────────────────
+window.openOverlay  = (id) => document.getElementById(id).classList.add('show');
+window.closeOverlay = (id) => document.getElementById(id).classList.remove('show');
+document.querySelectorAll('.overlay').forEach(o =>
+  o.addEventListener('click', e => { if(e.target===o) o.classList.remove('show'); })
+);
+
+// ── Confirm ───────────────────────────────────────
+function confirm2(title, text, btn, cb) {
+  document.getElementById('c-title').textContent = title;
+  document.getElementById('c-text').textContent  = text;
+  document.getElementById('c-btn').textContent   = btn;
+  confirmCb = cb;
+  openOverlay('confirmOverlay');
+}
+document.getElementById('c-btn').addEventListener('click', () => {
+  if (confirmCb) confirmCb();
+  closeOverlay('confirmOverlay');
+  confirmCb = null;
+});
+
+// ── Toast ─────────────────────────────────────────
+let toastT;
+window.toast = (msg) => {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(()=>t.classList.remove('show'), 2400);
+};
+
+// ── Keyboard ─────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key==='Escape') document.querySelectorAll('.overlay.show').forEach(o=>o.classList.remove('show'));
+  if ((e.metaKey||e.ctrlKey)&&e.key==='k') { e.preventDefault(); window.openAddModal(); }
+});
+document.getElementById('m-url').addEventListener('keydown',  e=>{ if(e.key==='Enter') window.addUrl(); });
+document.getElementById('m-name').addEventListener('keydown', e=>{ if(e.key==='Enter') window.addUrl(); });
+document.getElementById('f-name').addEventListener('keydown', e=>{ if(e.key==='Enter') window.saveFolder(); });
+document.getElementById('a-email').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('a-pass').focus(); });
+document.getElementById('a-pass').addEventListener('keydown', e=>{ if(e.key==='Enter') window.handleAuth(); });
+document.getElementById('a-pass2').addEventListener('keydown',e=>{ if(e.key==='Enter') window.handleAuth(); });
+
+</script>
+</body>
+</html>
